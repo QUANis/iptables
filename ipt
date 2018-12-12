@@ -1,0 +1,162 @@
+防火墙规则
+添加规则
+iptables -t filter  -I INPUT  -p icmp -j REJECT 
+[root@lvs88 ~]# iptables -t filter  -I INPUT  -p icmp -j DROP 
+[root@lvs88 ~]# iptables -nL
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+DROP       icmp --  0.0.0.0/0            0.0.0.0/0           
+REJECT     icmp --  0.0.0.0/0            0.0.0.0/0            reject-with icmp-port-unreachable
+
+
+iptables -nL --line-numbers     //显示行号规则
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    DROP       icmp --  0.0.0.0/0            0.0.0.0/0           
+2    REJECT     icmp --  0.0.0.0/0            0.0.0.0/0            reject-with 
+
+ 
+插入规则
+iptables -I INPUT -p udp -j ACCEPT 
+
+iptables -nL --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    ACCEPT     udp  --  0.0.0.0/0            0.0.0.0/0           
+2    DROP       icmp --  0.0.0.0/0            0.0.0.0/0           
+3    REJECT     icmp --  0.0.0.0/0            0.0.0.0/0            reject-with i
+
+
+追加规则
+iptables -A INPUT -p tcp -j ACCEPT
+
+
+iptables -nL --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    ACCEPT     udp  --  0.0.0.0/0            0.0.0.0/0           
+2    DROP       icmp --  0.0.0.0/0            0.0.0.0/0           
+3    REJECT     icmp --  0.0.0.0/0            0.0.0.0/0            reject-with icmp-port-unreachable
+4    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0           
+
+
+插入XX几行
+iptables -I INPUT 2 -p icmp -j ACCEPT
+
+iptables -nL --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    ACCEPT     udp  --  0.0.0.0/0            0.0.0.0/0           
+2    ACCEPT     icmp --  0.0.0.0/0            0.0.0.0/0           
+3    DROP       icmp --  0.0.0.0/0            0.0.0.0/0           
+4    REJECT     icmp --  0.0.0.0/0            0.0.0.0/0            reject-with icmp-port-unreachable
+5    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0           
+
+
+删除规则
+iptables -D INPUT 3
+
+iptables -nL --line-numbers
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination         
+1    ACCEPT     udp  --  0.0.0.0/0            0.0.0.0/0           
+2    ACCEPT     icmp --  0.0.0.0/0            0.0.0.0/0           
+3    REJECT     icmp --  0.0.0.0/0            0.0.0.0/0            reject-with icmp-port-unreachable
+4    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0           
+
+
+默认规则
+iptables -I INPUT -p tcp -j ACCEPT
+
+iptables -nL INPUT 
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0      
+
+添加默认规则然后在ping
+iptables -P INPUT DROP
+
+iptables -nL INPUT 
+Chain INPUT (policy DROP)
+target     prot opt source               destination         
+ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0       
+
+
+拒绝22ping 我
+iptables -I INPUT -s 192.168.4.22 -p icmp -j REJECT
+
+iptables -nL
+Chain INPUT (policy DROP)
+target     prot opt source               destination         
+REJECT     icmp --  192.168.4.22         0.0.0.0/0            reject-with icmp-p
+
+拒绝我ping22
+iptables -I OUTPUT -d 192.168.4.22 -p icmp -j DROP
+
+iptables -nL
+Chain INPUT (policy DROP)
+target     prot opt source               destination         
+REJECT     icmp --  192.168.4.22         0.0.0.0/0            reject-with icmp-p
+
+
+端口拒绝
+iptables -I INPUT -p tcp --dport 80 -j REJECT
+
+限制4.100访问80
+iptables -I FORWARD -s 192.168.4.100 -p tcp --dport 80 -j REJECT
+
+
+client--------->proxy
+    1请求 （活着吗？）OUTPUT
+    2回应 （还活着）INPUT
+iptables -I INPUT  -p icmp --icmp-type echo-request -j REJECT
+
+iptables 选项 链名称 -m 扩展模块 --具体扩展条件 -j 动作
+
+扫描MAC地址
+nmap -n -sP 192.168.4.100
+
+Starting Nmap 6.40 ( http://nmap.org ) at 2018-12-11 16:15 CST
+Nmap scan report for 192.168.4.100
+Host is up (0.00023s latency).
+MAC Address: 52:54:00:FC:64:F6 (QEMU Virtual NIC)
+Nmap done: 1 IP address (1 host up) scanned in 0.02 seconds
+
+禁止4.100访问ssh
+iptables -I INPUT -m mac --mac 52:54:00:FC:64:F6 -p tcp --dport 22 -j REJECT
+
+
+一次性添加多个端口允许
+iptables -I INPUT -p tcp  -m multiport --dports  21,22,80,100:500 -j ACCEPT
+
+
+一次性拒绝多个IPssh22端口
+iptables -I INPUT -p tcp --dport 22 -m iprange --src-range 192.168.4.1-192.168.4.100 -j REJECT
+
+清除NAT规则
+iptables -t nat -F
+查看NAT规则
+iptables -t nat -nL
+
+在4.5为公网4.100为私网NAT地址转换
+iptables -t nat -I POSTROUTING -s 192.168.4.0/24 -j SNAT --to-source 192.168.4.5
+查看
+iptables -t nat -nL
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination         
+SNAT       all  --  192.168.4.0/24       0.0.0.0/0            to:192.168.4.5
+
+
+客户端查看日志就
+
+添加DNS
+nmcli connection modify eth0 ipv4.method manual ipv4.dns 8.8.8.8 ipv4.gateway 192.168.4.254
